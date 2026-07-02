@@ -1,0 +1,48 @@
+services:
+
+  # Base de datos persistente para producción
+  postgres:
+    image: postgres:16-alpine
+    container_name: bank-postgres
+    environment:
+      POSTGRES_DB: bankdb
+      POSTGRES_USER: bank
+      POSTGRES_PASSWORD: bank
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bank -d bankdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Microservicio Spring Boot
+  backend:
+    build: .
+    container_name: bank-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: bankdb
+      DB_USER: bank
+      DB_PASSWORD: bank
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Frontend React servido por Nginx
+  frontend:
+    build: ./frontend
+    container_name: bank-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

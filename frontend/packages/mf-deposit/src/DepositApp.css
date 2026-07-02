@@ -1,0 +1,16 @@
+.deposit-app .deposit-icon {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.deposit-app .btn-deposit {
+  background: #16a34a;
+}
+
+.deposit-app .btn-deposit:hover:not(:disabled) {
+  background: #15803d;
+}
+
+.deposit-app .alert-success {
+  margin-top: 1.25rem;
+}

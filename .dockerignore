@@ -1,0 +1,12 @@
+.git
+.gitignore
+.gradle
+build
+out
+.idea
+*.iml
+frontend/node_modules
+frontend/dist
+README.md
+postman
+*.md

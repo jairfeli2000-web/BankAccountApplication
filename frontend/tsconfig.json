@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@bank/shared": ["./packages/shared/src"],
+      "@bank/shared/*": ["./packages/shared/src/*"],
+      "@bank/mf-account-creation": ["./packages/mf-account-creation/src"],
+      "@bank/mf-balance-inquiry": ["./packages/mf-balance-inquiry/src"],
+      "@bank/mf-deposit": ["./packages/mf-deposit/src"],
+      "@bank/mf-withdraw": ["./packages/mf-withdraw/src"]
+    }
+  },
+  "include": ["src", "packages"]
+}
