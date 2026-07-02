@@ -1,0 +1,16 @@
+.withdraw-app .withdraw-icon {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+}
+
+.withdraw-app .btn-withdraw {
+  background: #ea580c;
+}
+
+.withdraw-app .btn-withdraw:hover:not(:disabled) {
+  background: #c2410c;
+}
+
+.withdraw-app .alert-success {
+  margin-top: 1.25rem;
+}
