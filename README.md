@@ -401,4 +401,4 @@ flowchart TB
 
 ## Autor
 
-Prueba Técnica — Desarrollador Full Stack
+Prueba Técnica — Desarrollador Jair Felipe Sanchez
