@@ -10,7 +10,7 @@ import {
   ErrorResponse,
   TransactionRequest,
   TransactionResponse,
-} from './types';
+} from '../types';
 import { logger } from '../util/logger';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
