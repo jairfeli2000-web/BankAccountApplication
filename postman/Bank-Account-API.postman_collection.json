@@ -1,0 +1,148 @@
+{
+  "info": {
+    "name": "Bank Account API",
+    "description": "Colección Postman para el microservicio de cuentas bancarias",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "accountId",
+      "value": "1"
+    }
+  ],
+  "item": [
+    {
+      "name": "Crear Cuenta Bancaria",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"titular\": \"Juan Pérez\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/accounts",
+          "host": ["{{baseUrl}}"],
+          "path": ["accounts"]
+        },
+        "description": "Crea una nueva cuenta bancaria con saldo inicial en 0"
+      },
+      "response": []
+    },
+    {
+      "name": "Consignación (Depósito)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"monto\": 500.00\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/accounts/{{accountId}}/deposit",
+          "host": ["{{baseUrl}}"],
+          "path": ["accounts", "{{accountId}}", "deposit"]
+        },
+        "description": "Realiza una consignación en la cuenta especificada"
+      },
+      "response": []
+    },
+    {
+      "name": "Retiro",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"monto\": 200.00\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/accounts/{{accountId}}/withdraw",
+          "host": ["{{baseUrl}}"],
+          "path": ["accounts", "{{accountId}}", "withdraw"]
+        },
+        "description": "Realiza un retiro de la cuenta especificada"
+      },
+      "response": []
+    },
+    {
+      "name": "Consultar Saldo",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/accounts/{{accountId}}/balance",
+          "host": ["{{baseUrl}}"],
+          "path": ["accounts", "{{accountId}}", "balance"]
+        },
+        "description": "Consulta el saldo de la cuenta especificada"
+      },
+      "response": []
+    },
+    {
+      "name": "Crear Cuenta - Validación Error (titular vacío)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"titular\": \"\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/accounts",
+          "host": ["{{baseUrl}}"],
+          "path": ["accounts"]
+        },
+        "description": "Prueba de validación: titular vacío debe retornar 400"
+      },
+      "response": []
+    },
+    {
+      "name": "Retiro - Saldo Insuficiente",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"monto\": 99999.00\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/accounts/{{accountId}}/withdraw",
+          "host": ["{{baseUrl}}"],
+          "path": ["accounts", "{{accountId}}", "withdraw"]
+        },
+        "description": "Prueba de validación: retiro con saldo insuficiente debe retornar 400"
+      },
+      "response": []
+    }
+  ]
+}
