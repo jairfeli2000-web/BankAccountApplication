@@ -386,4 +386,4 @@ docker compose up --build -d
 
 ## Autor
 
-Prueba Técnica — Desarrollador Full Stack
+Prueba Técnica — Desarrollador Jair Felipe Sanchez
