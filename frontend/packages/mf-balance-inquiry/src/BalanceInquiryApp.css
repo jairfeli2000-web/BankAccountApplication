@@ -1,0 +1,12 @@
+.balance-inquiry .balance-result {
+  margin-top: 1.5rem;
+}
+
+.balance-amount {
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent);
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 1rem;
+}
