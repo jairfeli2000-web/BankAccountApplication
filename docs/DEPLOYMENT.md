@@ -18,10 +18,35 @@ Este documento describe el proceso de despliegue del microservicio bancario y su
 - **Base de datos**: H2 solo en desarrollo; PostgreSQL en despliegue real por persistencia y escalabilidad.
 - **Frontend**: Build estático servido por Nginx con proxy reverso hacia el backend.
 - **Perfiles Spring**: `default` (H2) y `prod` (PostgreSQL) activados por variable de entorno.
+- **API Gateway (cloud)**: capa de entrada para la API REST antes del balanceador; centraliza autenticación, throttling y enrutamiento.
 
 ---
 
 ## 2. Despliegue local con Docker (recomendado para demo)
+
+### Diagrama Docker Compose
+
+Código Mermaid: [`deployment-docker.mmd`](deployment-docker.mmd)
+
+```mermaid
+flowchart TB
+    User([Usuario / Navegador])
+
+    subgraph Compose["docker-compose.yml"]
+        FE["bank-frontend<br/>Nginx + React — :80"]
+        BE["bank-backend<br/>Spring Boot — :8080"]
+        PG[("bank-postgres<br/>PostgreSQL 16 — :5432")]
+        VOL[("postgres_data")]
+    end
+
+    User -->|"http://localhost"| FE
+    User -->|"http://localhost:8080"| BE
+    FE -->|"proxy /accounts"| BE
+    BE -->|JDBC| PG
+    PG --- VOL
+```
+
+Diagrama sin Docker (desarrollo local): [`deployment-sin-docker.mmd`](deployment-sin-docker.mmd)
 
 ### Requisitos
 
@@ -117,31 +142,59 @@ jobs:
 
 ### Arquitectura propuesta
 
+Diagramas en formato Mermaid (renderizables en GitHub). Código completo: [`deployment-cloud.mmd`](deployment-cloud.mmd).
+
+```mermaid
+flowchart TB
+    User([Internet])
+
+    R53["Route 53<br/>(DNS)"]
+
+    subgraph Static["Frontend estático"]
+        CF["CloudFront + S3<br/>React compilado"]
+    end
+
+    AGW["API Gateway<br/>(REST /accounts)"]
+    ALB["Application Load Balancer<br/>(ALB)"]
+    ECS["ECS / Kubernetes<br/>Spring Boot :8080"]
+    RDS[("RDS PostgreSQL<br/>(Multi-AZ)")]
+
+    User --> R53
+    R53 --> CF
+    R53 --> AGW
+    CF -.->|"llamadas /accounts"| AGW
+    AGW -->|"VPC Link"| ALB
+    ALB --> ECS
+    ECS -->|JDBC| RDS
 ```
-Internet
-    │
-    ▼
-┌─────────────┐
-│  Route 53   │  DNS
-└──────┬──────┘
-       │
-┌──────▼──────┐
-│     ALB     │  Load Balancer
-└──┬───────┬──┘
-   │       │
-   ▼       ▼
-┌──────┐ ┌──────┐
-│ ECS  │ │ ECS  │  Frontend (Nginx) + Backend (Spring Boot)
-│Task 1│ │Task 2│
-└──┬───┘ └──┬───┘
-   │        │
-   └────┬───┘
-        ▼
-┌──────────────┐
-│  RDS         │  PostgreSQL
-│  (Multi-AZ)  │
-└──────────────┘
+
+### Rol del API Gateway (antes del balanceador)
+
+El **API Gateway** se coloca como punto de entrada de la API REST, **delante del ALB**. El balanceador sigue distribuyendo tráfico entre instancias del backend; el gateway agrega una capa de gobierno sobre esa API.
+
+| Responsabilidad | API Gateway | ALB |
+|---|---|---|
+| Punto de entrada público de `/accounts` | Sí | No (recibe tráfico ya enrutado) |
+| Autenticación / API keys / JWT | Sí | No |
+| Rate limiting y throttling | Sí | No |
+| Enrutamiento por path y versión | Sí | Sí (hacia target groups) |
+| Balanceo entre contenedores | No | Sí |
+| Health checks de instancias | No | Sí |
+
+**Flujo de una petición API:**
+
 ```
+Cliente → Route 53 → API Gateway → ALB → ECS (Spring Boot) → RDS
+```
+
+**Flujo del portal web:**
+
+```
+Cliente → Route 53 → CloudFront → S3/Nginx (React estático)
+         └── (llamadas /accounts) → API Gateway → ALB → Backend
+```
+
+En AWS, API Gateway puede integrarse con el ALB mediante **VPC Link** (HTTP API / REST API) o, en arquitecturas más simples, exponer directamente un NLB interno delante de ECS.
 
 ### Pasos de despliegue en AWS
 
@@ -153,21 +206,22 @@ Internet
    docker push <account>.dkr.ecr.<region>.amazonaws.com/bank-backend:latest
    ```
 3. **Crear RDS PostgreSQL** (db.t3.micro para demo).
-4. **Crear ECS Cluster** con Task Definition:
-   - Backend: puerto 8080, variables `SPRING_PROFILES_ACTIVE=prod`, `DB_HOST=<rds-endpoint>`.
-   - Frontend: puerto 80.
-5. **Configurar ALB** con reglas de routing:
-   - `/accounts/*` → target group backend
-   - `/*` → target group frontend
-6. **Variables de entorno** vía AWS Secrets Manager (credenciales DB).
+4. **Crear ECS Cluster** con Task Definition del backend (puerto 8080, perfil `prod`, `DB_HOST=<rds-endpoint>`).
+5. **Configurar ALB** con target group hacia las tareas ECS del backend.
+6. **Configurar API Gateway** (REST o HTTP API):
+   - Rutas: `POST /accounts`, `POST /accounts/{id}/deposit`, `POST /accounts/{id}/withdraw`, `GET /accounts/{id}/balance`
+   - Integración con ALB vía VPC Link (o NLB interno)
+   - Throttling, CORS y (opcional) autenticación con API Key o Cognito
+7. **Frontend estático** en S3 + CloudFront; el portal consume la API a través del dominio del API Gateway.
+8. **Variables de entorno** vía AWS Secrets Manager (credenciales DB).
 
 ### Alternativas cloud
 
-| Proveedor | Servicio contenedores | Base de datos |
-|---|---|---|
-| AWS | ECS Fargate / EKS | RDS PostgreSQL |
-| Azure | Container Apps / AKS | Azure Database for PostgreSQL |
-| GCP | Cloud Run / GKE | Cloud SQL PostgreSQL |
+| Proveedor | API Gateway | Servicio contenedores | Base de datos |
+|---|---|---|---|
+| AWS | API Gateway | ECS Fargate / EKS | RDS PostgreSQL |
+| Azure | API Management | Container Apps / AKS | Azure Database for PostgreSQL |
+| GCP | Apigee / API Gateway | Cloud Run / GKE | Cloud SQL PostgreSQL |
 
 ---
 

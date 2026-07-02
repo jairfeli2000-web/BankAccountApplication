@@ -1,0 +1,25 @@
+%% Despliegue en la nube — AWS (referencia)
+%% Ver también: docs/DEPLOYMENT.md
+%% Previsualizar: https://mermaid.live
+
+flowchart TB
+    User([Internet])
+
+    R53["Route 53<br/>(DNS)"]
+
+    subgraph Static["Frontend estático"]
+        CF["CloudFront + S3<br/>React compilado"]
+    end
+
+    AGW["API Gateway<br/>(REST /accounts)"]
+    ALB["Application Load Balancer<br/>(ALB)"]
+    ECS["ECS / Kubernetes<br/>Spring Boot :8080"]
+    RDS[("RDS PostgreSQL<br/>(Multi-AZ)")]
+
+    User --> R53
+    R53 --> CF
+    R53 --> AGW
+    CF -.->|"llamadas /accounts"| AGW
+    AGW -->|"VPC Link"| ALB
+    ALB --> ECS
+    ECS -->|JDBC| RDS

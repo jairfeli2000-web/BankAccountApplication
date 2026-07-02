@@ -1,0 +1,24 @@
+%% Despliegue CON Docker — Docker Compose
+%% Comando: docker compose up --build -d
+%% Previsualizar: https://mermaid.live
+
+flowchart TB
+    User([Usuario / Navegador])
+
+    subgraph Host["Máquina local — Docker Desktop"]
+        subgraph Compose["docker-compose.yml"]
+            FE["bank-frontend<br/>────────────<br/>Build: frontend/Dockerfile<br/>Nginx + React estático<br/>Puerto: 80"]
+            BE["bank-backend<br/>────────────<br/>Build: Dockerfile<br/>Spring Boot 3 — perfil prod<br/>Puerto: 8080"]
+            PG[("bank-postgres<br/>────────────<br/>Image: postgres:16-alpine<br/>Puerto: 5432<br/>DB: bankdb")]
+            VOL[("postgres_data<br/>volumen persistente")]
+        end
+    end
+
+    User -->|"http://localhost"| FE
+    User -->|"http://localhost:8080<br/>API / Swagger"| BE
+    FE -->|"proxy /accounts<br/>(nginx.conf)"| BE
+    BE -->|"JDBC<br/>DB_HOST=postgres"| PG
+    PG --- VOL
+
+    FE -.->|depends_on| BE
+    BE -.->|depends_on<br/>service_healthy| PG
