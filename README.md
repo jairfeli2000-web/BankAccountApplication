@@ -271,7 +271,7 @@ Documentación completa en [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 Desarrollo local          Docker (demo/staging)         Producción (cloud)
 ─────────────────         ─────────────────────         ──────────────────
 gradlew bootRun      →    docker compose up      →     ECS / K8s / Cloud Run
-H2 in-memory              PostgreSQL + Nginx            RDS PostgreSQL + ALB
+H2 in-memory              PostgreSQL + Nginx            RDS PostgreSQL + API Gateway + ALB
 localhost:8080            localhost:80                  dominio público
 ```
 
@@ -304,66 +304,81 @@ docker compose up --build -d
 - **Docker multi-stage**: imagen final ligera (~200 MB) sin herramientas de build.
 - **Nginx** como reverse proxy: el frontend llama a `/accounts` y Nginx redirige al backend.
 - **CI/CD propuesto**: build → test → docker push → deploy (GitHub Actions / Jenkins).
-- **Cloud**: arquitectura con ALB + ECS + RDS (AWS) documentada en `docs/DEPLOYMENT.md`.
+- **Cloud**: arquitectura con API Gateway + ALB + ECS + RDS (AWS) documentada en `docs/DEPLOYMENT.md`.
 
 ## Diagrama de despliegue
 
-### Desarrollo local
+Diagramas en **Mermaid** (se renderizan en GitHub). Código fuente en archivos separados:
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│                         Frontend (React)                              │
-│  ┌──────────┐ ┌─────────────┐ ┌────────────┐ ┌──────────────────┐  │
-│  │Shell App │ │mf-account-  │ │ mf-deposit │ │  mf-withdraw     │  │
-│  │ (Host)   │ │ creation    │ │            │ │                  │  │
-│  │  :5173   │ └─────────────┘ └────────────┘ └──────────────────┘  │
-│  └────┬─────┘ ┌──────────────────────────────────────────────────┐  │
-│       │       │           mf-balance-inquiry                       │  │
-│       └───────┴──────────────────────────────────────────────────┘  │
-└───────────────────────────────┬──────────────────────────────────────┘
-                                │ HTTP/REST
-                                ▼
-                 ┌──────────────────────────┐
-                 │  Bank Account Service    │
-                 │  (Spring Boot 3)         │
-                 │  Puerto: 8080            │
-                 └──────────┬───────────────┘
-                            │ JPA/Hibernate
-                            ▼
-                 ┌──────────────────────────┐
-                 │     H2 Database (In-Mem)  │
-                 │  - cuentas_bancarias      │
-                 │  - transacciones          │
-                 └──────────────────────────┘
+| Escenario | Archivo | Comando |
+|---|---|---|
+| **Sin Docker** (desarrollo local) | [`docs/deployment-sin-docker.mmd`](docs/deployment-sin-docker.mmd) | `gradlew bootRun` + `npm run dev` |
+| **Con Docker** (Compose) | [`docs/deployment-docker.mmd`](docs/deployment-docker.mmd) | `docker compose up --build -d` |
+| Cloud (AWS) | [`docs/deployment-cloud.mmd`](docs/deployment-cloud.mmd) | Ver [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) |
+
+Previsualizar en: https://mermaid.live
+
+### Sin Docker (desarrollo local)
+
+```mermaid
+flowchart TB
+    User([Usuario / Navegador])
+
+    subgraph Terminal1["Terminal 1 — Backend"]
+        Gradle["Gradle Wrapper<br/>gradlew bootRun"]
+        BE["Bank Account Service<br/>Spring Boot 3<br/>localhost:8080<br/>perfil default"]
+        H2[("H2 Database<br/>(in-memory)")]
+        Gradle --> BE
+        BE -->|JPA / Hibernate| H2
+    end
+
+    subgraph Terminal2["Terminal 2 — Frontend"]
+        NPM["npm run dev"]
+        subgraph MFE["React + Vite — localhost:5173"]
+            Shell[Shell App]
+            MFE1[mf-account-creation]
+            MFE2[mf-deposit]
+            MFE3[mf-withdraw]
+            MFE4[mf-balance-inquiry]
+            Shared["@bank/shared"]
+            Shell --> MFE1 & MFE2 & MFE3 & MFE4
+            MFE1 & MFE2 & MFE3 & MFE4 --> Shared
+        end
+        NPM --> MFE
+    end
+
+    User -->|"http://localhost:5173"| MFE
+    User -->|"http://localhost:8080/swagger-ui.html"| BE
+    Shared -->|"HTTP REST /accounts<br/>proxy Vite → :8080"| BE
 ```
 
-### Producción (Docker / Cloud)
+### Con Docker (Docker Compose)
 
+```mermaid
+flowchart TB
+    User([Usuario / Navegador])
+
+    subgraph Host["Máquina local — Docker Desktop"]
+        subgraph Compose["docker-compose.yml"]
+            FE["bank-frontend<br/>Nginx + React — :80"]
+            BE["bank-backend<br/>Spring Boot — :8080<br/>perfil prod"]
+            PG[("bank-postgres<br/>PostgreSQL 16 — :5432")]
+            VOL[("postgres_data")]
+        end
+    end
+
+    User -->|"http://localhost"| FE
+    User -->|"http://localhost:8080"| BE
+    FE -->|"proxy /accounts"| BE
+    BE -->|JDBC| PG
+    PG --- VOL
 ```
-                        Internet
-                           │
-                           ▼
-                 ┌──────────────────┐
-                 │  Load Balancer   │
-                 │  (ALB / Nginx)   │
-                 └────────┬─────────┘
-                          │
-              ┌───────────┴───────────┐
-              ▼                       ▼
-   ┌──────────────────┐    ┌──────────────────┐
-   │  Frontend (Nginx)│    │  Backend (Spring) │
-   │  Puerto: 80      │───►│  Puerto: 8080     │
-   │  React estático  │    │  Microservicio    │
-   └──────────────────┘    └────────┬─────────┘
-                                    │ JDBC
-                                    ▼
-                         ┌──────────────────┐
-                         │   PostgreSQL     │
-                         │   (RDS / Docker) │
-                         │  - cuentas       │
-                         │  - transacciones │
-                         └──────────────────┘
-```
+
+| Contenedor | Build / Imagen | Puerto |
+|---|---|---|
+| `bank-frontend` | `frontend/Dockerfile` | 80 |
+| `bank-backend` | `Dockerfile` | 8080 |
+| `bank-postgres` | `postgres:16-alpine` | 5432 |
 
 ## Estructura de entidades
 
